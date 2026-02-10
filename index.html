@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSE Career Archive | Master the Core</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300..700&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root { --bg: #ffffff; --text: #0a0a0a; --accent: #4f46e5; }
+        body { font-family: 'Space Grotesk', sans-serif; background-color: var(--bg); color: var(--text); scroll-behavior: smooth; }
+        .serif { font-family: 'Playfair Display', serif; }
+        
+        .glass { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(16px); border-bottom: 1px solid rgba(0,0,0,0.05); }
+        .card-shadow { transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1); border: 1px solid #f0f0f0; }
+        .card-shadow:hover { border-color: var(--accent); transform: translateY(-4px); box-shadow: 0 20px 40px -15px rgba(79, 70, 229, 0.1); }
+        
+        pre { background: #f8f8f8; padding: 1rem; border-radius: 0.75rem; font-family: monospace; font-size: 0.875rem; overflow-x: auto; border: 1px solid #eee; }
+        code { color: #e11d48; font-weight: 600; font-size: 0.9em; }
+
+        .loading-shimmer {
+            background: linear-gradient(90deg, #f0f0f0 25%, #f8f8f8 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+        }
+        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+        
+        .db-status { font-size: 10px; padding: 2px 8px; border-radius: 99px; transition: all 0.3s ease; }
+        .status-online { background: #dcfce7; color: #166534; }
+        .status-offline { background: #fee2e2; color: #991b1b; }
+    </style>
+</head>
+<body class="antialiased selection:bg-indigo-100 selection:text-indigo-900">
+
+    <div id="scroll-progress" class="fixed top-0 left-0 h-1 bg-indigo-600 z-[100] transition-all duration-150" style="width: 0%"></div>
+
+    <!-- Navigation -->
+    <nav class="glass sticky top-0 z-50 px-6 py-4">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div class="flex items-center space-x-3 group cursor-pointer" onclick="location.reload()">
+                <div class="w-10 h-10 bg-black rounded-xl flex items-center justify-center text-white group-hover:bg-indigo-600 transition-colors">
+                    <i data-lucide="binary" class="w-6 h-6"></i>
+                </div>
+                <div class="hidden sm:block">
+                    <h1 class="font-bold tracking-tighter text-xl leading-none uppercase">CSE_ARCHIVE</h1>
+                    <div class="flex items-center gap-2 mt-1">
+                        <p class="text-[9px] font-black uppercase tracking-[0.2em] text-stone-400">v3.1 • Active</p>
+                        <span id="db-indicator" class="db-status status-offline">Connecting...</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-2 md:space-x-4">
+                <div class="relative">
+                    <input type="text" oninput="app.search(this.value)" id="global-search" placeholder="Search archive..." 
+                           class="bg-stone-100 border-none rounded-full px-10 py-2 text-sm focus:ring-2 focus:ring-indigo-500 transition-all w-32 sm:w-48 lg:w-64">
+                    <i data-lucide="search" class="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400 w-3.5 h-3.5"></i>
+                </div>
+                
+                <button id="lock-btn" onclick="app.toggleOwnerMode()" 
+                    class="flex items-center space-x-2 bg-stone-900 text-white px-4 py-2 rounded-xl transition-all duration-300 shadow-lg">
+                    <i id="lock-icon" data-lucide="lock" class="w-4 h-4"></i>
+                    <span id="lock-text" class="text-[10px] font-bold uppercase tracking-widest hidden sm:inline">Admin</span>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Header -->
+    <header class="max-w-7xl mx-auto px-6 pt-16 pb-12">
+        <div class="flex flex-col md:flex-row md:items-end justify-between gap-8">
+            <div class="max-w-3xl">
+                <h2 id="main-tagline" class="serif text-5xl md:text-7xl font-medium tracking-tight leading-[1.1]">
+                    The last syllabus you'll ever need.
+                </h2>
+                <p class="mt-8 text-stone-500 text-lg md:text-xl font-light max-w-xl">
+                    Centralized knowledge for Computer Science. Typeset with <span class="text-indigo-600 font-medium">Precision</span>.
+                </p>
+            </div>
+        </div>
+    </header>
+
+    <!-- Content Area -->
+    <div class="max-w-7xl mx-auto px-6 pb-24">
+        <div id="main-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+        <div id="empty-state" class="hidden flex flex-col items-center justify-center py-24 text-stone-400">
+            <i data-lucide="file-question" class="mb-4 opacity-20 w-12 h-12"></i>
+            <p id="empty-msg">Waiting for database sync...</p>
+        </div>
+    </div>
+
+    <!-- Floating Action -->
+    <button id="add-btn" onclick="app.openEditor()" class="hidden fixed bottom-8 right-8 z-40 bg-indigo-600 text-white w-14 h-14 rounded-2xl shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all">
+        <i data-lucide="plus" class="w-6 h-6"></i>
+    </button>
+
+    <!-- Reader Modal -->
+    <div id="reader-modal" class="hidden fixed inset-0 z-[60] bg-white overflow-hidden flex flex-col">
+        <div class="p-6 border-b border-stone-100 flex justify-between items-center bg-white">
+            <button onclick="app.closeReader()" class="flex items-center space-x-2 text-stone-400 hover:text-black">
+                <i data-lucide="arrow-left" class="w-4.5 h-4.5"></i>
+                <span class="text-[10px] font-bold uppercase">Back</span>
+            </button>
+            <div class="flex items-center space-x-2">
+                <button id="read-toggle-btn" onclick="app.toggleReadStatus()" class="bg-black text-white px-6 py-2 rounded-xl text-[10px] font-bold uppercase">Mastered</button>
+                <button id="owner-delete-btn" onclick="app.deleteCurrentPost()" class="hidden p-2 text-red-400"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
+            </div>
+        </div>
+        <div class="flex-grow overflow-y-auto px-6 py-12 md:px-24">
+            <div id="reader-meta" class="mb-4"></div>
+            <h1 id="reader-title" class="serif text-4xl md:text-6xl mb-12"></h1>
+            <div id="reader-content" class="max-w-4xl space-y-12 pb-20"></div>
+        </div>
+    </div>
+
+    <!-- Editor Modal -->
+    <div id="editor-modal" class="hidden fixed inset-0 z-[70] bg-stone-900/40 backdrop-blur-md p-4 flex items-center justify-center">
+         <div class="bg-white w-full max-w-4xl rounded-[2rem] p-8 relative shadow-2xl flex flex-col max-h-[90vh]">
+             <div class="flex justify-between items-center mb-6">
+                <h2 class="serif text-2xl">Create Archive Entry</h2>
+                <button onclick="app.closeEditor()" class="p-2 hover:bg-stone-100 rounded-full"><i data-lucide="x" class="w-5 h-5"></i></button>
+             </div>
+             
+             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                <input id="edit-title" placeholder="Entry Title" class="text-xl font-bold border-b border-stone-100 pb-2 focus:border-indigo-500 outline-none">
+                <input id="edit-topic" placeholder="Category (e.g. DBMS)" class="border-b border-stone-100 pb-2 focus:border-indigo-500 outline-none uppercase text-xs font-bold">
+             </div>
+
+             <div id="blocks-container" class="flex-grow overflow-y-auto pr-4 space-y-4 mb-6"></div>
+             
+             <div class="flex flex-wrap gap-2 items-center bg-stone-50 p-4 rounded-2xl">
+                 <button onclick="app.addBlock('text')" class="flex items-center space-x-2 bg-white px-4 py-2 rounded-lg text-[10px] font-bold uppercase border border-stone-200">
+                    <i data-lucide="type" class="w-3.5 h-3.5"></i> <span>Text</span>
+                 </button>
+                 <button onclick="app.addBlock('qa')" class="flex items-center space-x-2 bg-white px-4 py-2 rounded-lg text-[10px] font-bold uppercase border border-stone-200">
+                    <i data-lucide="help-circle" class="w-3.5 h-3.5"></i> <span>Q&A</span>
+                 </button>
+                 <button id="publish-btn" onclick="app.savePost()" class="ml-auto bg-indigo-600 text-white px-8 py-3 rounded-xl text-[10px] font-bold uppercase shadow-lg shadow-indigo-100 disabled:opacity-50">
+                    Publish to Archive
+                 </button>
+             </div>
+         </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, onSnapshot, query, deleteDoc, doc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+        // Global environment variables
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+        window.app = {
+            db: null,
+            auth: null,
+            user: null,
+            posts: [],
+            isOwner: false,
+            blocks: [],
+            readList: JSON.parse(localStorage.getItem('cse_v3_read') || '[]'),
+            editingId: null,
+            activePost: null,
+            unsubscribe: null,
+
+            async init() {
+                if (!firebaseConfig.apiKey) {
+                    this.setDbStatus('offline', 'Demo Mode');
+                    this.renderGrid([]);
+                    return;
+                }
+
+                try {
+                    const fbApp = initializeApp(firebaseConfig);
+                    this.db = getFirestore(fbApp);
+                    this.auth = getAuth(fbApp);
+
+                    // Listen for auth state FIRST
+                    onAuthStateChanged(this.auth, (user) => {
+                        window.app.user = user;
+                        if (user) {
+                            window.app.setDbStatus('online', 'Live Sync');
+                            window.app.startListening();
+                        } else {
+                            window.app.setDbStatus('offline', 'Connecting...');
+                        }
+                    });
+
+                    // Perform Sign In
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        await signInWithCustomToken(this.auth, __initial_auth_token);
+                    } else {
+                        await signInAnonymously(this.auth);
+                    }
+                } catch (err) {
+                    console.error("Firebase Auth error:", err);
+                    this.setDbStatus('offline', 'Auth Failed');
+                }
+                
+                lucide.createIcons();
+            },
+
+            setDbStatus(type, text) {
+                const indicator = document.getElementById('db-indicator');
+                if (!indicator) return;
+                indicator.className = `db-status status-${type}`;
+                indicator.innerText = text;
+            },
+
+            startListening() {
+                // GUARD: Must have DB and User
+                if (!this.db || !window.app.user) return;
+                
+                // Cleanup previous listener if exists
+                if (this.unsubscribe) {
+                    this.unsubscribe();
+                }
+
+                // RULE 1: Specific path
+                const postsCol = collection(this.db, 'artifacts', appId, 'public', 'data', 'posts');
+                
+                this.unsubscribe = onSnapshot(postsCol, (snap) => {
+                    this.posts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                    this.renderGrid();
+                }, (error) => {
+                    console.error("Firestore Error:", error);
+                    this.setDbStatus('offline', 'Sync Error');
+                });
+            },
+
+            toggleOwnerMode() {
+                if (!this.isOwner) {
+                    const pass = prompt("Access Key:");
+                    if (pass === "bcs2024") {
+                        this.isOwner = true;
+                        document.getElementById('add-btn').classList.remove('hidden');
+                        document.getElementById('lock-text').innerText = "Admin On";
+                        document.getElementById('lock-icon').setAttribute('data-lucide', 'unlock');
+                    }
+                } else {
+                    this.isOwner = false;
+                    document.getElementById('add-btn').classList.add('hidden');
+                    document.getElementById('lock-text').innerText = "Admin";
+                    document.getElementById('lock-icon').setAttribute('data-lucide', 'lock');
+                }
+                lucide.createIcons();
+            },
+
+            openEditor(existing = null) {
+                this.blocks = existing ? JSON.parse(JSON.stringify(existing.blocks)) : [];
+                this.editingId = existing ? existing.id : null;
+                document.getElementById('edit-title').value = existing ? existing.title : '';
+                document.getElementById('edit-topic').value = existing ? existing.topic : '';
+                this.renderEditorBlocks();
+                document.getElementById('editor-modal').classList.remove('hidden');
+            },
+
+            closeEditor() {
+                document.getElementById('editor-modal').classList.add('hidden');
+            },
+
+            addBlock(type) {
+                const id = Math.random().toString(36).substr(2, 9);
+                const content = type === 'qa' ? { q: '', a: '' } : '';
+                this.blocks.push({ id, type, content });
+                this.renderEditorBlocks();
+            },
+
+            updateBlock(id, val) {
+                const b = this.blocks.find(x => x.id === id);
+                if (b) b.content = val;
+            },
+
+            updateQA(id, field, val) {
+                const b = this.blocks.find(x => x.id === id);
+                if (b) b.content[field] = val;
+            },
+
+            async savePost() {
+                if (!window.app.user) {
+                   alert("Auth not ready. Please wait.");
+                   return;
+                }
+                
+                const title = document.getElementById('edit-title').value.trim();
+                const topic = document.getElementById('edit-topic').value.trim() || 'General';
+                const btn = document.getElementById('publish-btn');
+
+                if (!title || this.blocks.length === 0) return;
+
+                btn.disabled = true;
+                btn.innerText = "Syncing...";
+
+                const data = {
+                    title,
+                    topic,
+                    blocks: JSON.parse(JSON.stringify(this.blocks)),
+                    updatedAt: serverTimestamp()
+                };
+
+                try {
+                    const colRef = collection(this.db, 'artifacts', appId, 'public', 'data', 'posts');
+                    if (this.editingId) {
+                        await updateDoc(doc(colRef, this.editingId), data);
+                    } else {
+                        data.createdAt = serverTimestamp();
+                        await addDoc(colRef, data);
+                    }
+                    this.closeEditor();
+                } catch (e) {
+                    alert("Sync failed: " + e.message);
+                } finally {
+                    btn.disabled = false;
+                    btn.innerText = "Publish to Archive";
+                }
+            },
+
+            renderGrid(filtered = null) {
+                const grid = document.getElementById('main-grid');
+                const target = filtered !== null ? filtered : this.posts;
+                
+                if (target.length === 0) {
+                    document.getElementById('empty-state').classList.remove('hidden');
+                    grid.innerHTML = '';
+                    return;
+                }
+
+                document.getElementById('empty-state').classList.add('hidden');
+                grid.innerHTML = target.map(post => `
+                    <div onclick='app.openReader(${JSON.stringify(post).replace(/'/g, "&apos;")})' class="card-shadow bg-white p-8 rounded-[2rem] cursor-pointer group flex flex-col h-full relative overflow-hidden border">
+                        ${this.readList.includes(post.id) ? '<div class="absolute top-0 right-0 bg-indigo-600 text-white p-2 rounded-bl-xl"><i data-lucide="check" class="w-3 h-3"></i></div>' : ''}
+                        <span class="text-[9px] font-bold uppercase tracking-widest text-stone-400 mb-4">${post.topic}</span>
+                        <h3 class="serif text-2xl mb-6 group-hover:text-indigo-600 transition-colors">${post.title}</h3>
+                        <div class="mt-auto flex items-center text-[10px] font-bold uppercase tracking-widest text-stone-400">
+                            Learn More <i data-lucide="arrow-right" class="ml-2 w-3 h-3"></i>
+                        </div>
+                    </div>
+                `).join('');
+                lucide.createIcons();
+            },
+
+            renderEditorBlocks() {
+                const container = document.getElementById('blocks-container');
+                container.innerHTML = this.blocks.map(b => {
+                    if (b.type === 'text') return `
+                        <div class="p-4 bg-stone-50 rounded-2xl border">
+                            <textarea oninput="app.updateBlock('${b.id}', this.value)" class="w-full bg-transparent outline-none text-sm h-32" placeholder="Write content...">${b.content}</textarea>
+                        </div>`;
+                    if (b.type === 'qa') return `
+                        <div class="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100 space-y-2">
+                            <input oninput="app.updateQA('${b.id}', 'q', this.value)" value="${b.content.q}" class="w-full bg-white p-3 rounded-xl text-xs font-bold" placeholder="Question">
+                            <textarea oninput="app.updateQA('${b.id}', 'a', this.value)" class="w-full bg-white p-3 rounded-xl text-xs h-20" placeholder="Answer...">${b.content.a}</textarea>
+                        </div>`;
+                }).join('');
+                lucide.createIcons();
+            },
+
+            openReader(post) {
+                this.activePost = post;
+                document.getElementById('reader-title').innerText = post.title;
+                document.getElementById('reader-meta').innerHTML = `<span class="text-indigo-600 font-bold uppercase text-xs tracking-widest">${post.topic}</span>`;
+                
+                const content = post.blocks.map(b => {
+                    if (b.type === 'text') return `<p class="text-xl leading-relaxed text-stone-700">${b.content.replace(/\n/g, '<br>')}</p>`;
+                    if (b.type === 'qa') return `<div class="bg-indigo-50 p-8 rounded-3xl border border-indigo-100"><h4 class="text-2xl font-bold mb-4">Q: ${b.content.q}</h4><p class="text-lg opacity-80">A: ${b.content.a}</p></div>`;
+                    return '';
+                }).join('');
+
+                document.getElementById('reader-content').innerHTML = content;
+                document.getElementById('owner-delete-btn').classList.toggle('hidden', !this.isOwner);
+                document.getElementById('read-toggle-btn').innerText = this.readList.includes(post.id) ? "Learned" : "Master It";
+                document.getElementById('reader-modal').classList.remove('hidden');
+                lucide.createIcons();
+            },
+
+            closeReader() { document.getElementById('reader-modal').classList.add('hidden'); },
+
+            toggleReadStatus() {
+                const id = this.activePost.id;
+                if (this.readList.includes(id)) {
+                    this.readList = this.readList.filter(x => x !== id);
+                } else {
+                    this.readList.push(id);
+                }
+                localStorage.setItem('cse_v3_read', JSON.stringify(this.readList));
+                this.renderGrid();
+                document.getElementById('read-toggle-btn').innerText = this.readList.includes(id) ? "Learned" : "Master It";
+            },
+
+            async deleteCurrentPost() {
+                if (!confirm("Are you sure?")) return;
+                try {
+                    const colRef = collection(this.db, 'artifacts', appId, 'public', 'data', 'posts');
+                    await deleteDoc(doc(colRef, this.activePost.id));
+                    this.closeReader();
+                } catch (e) { console.error("Deletion failed", e); }
+            },
+
+            search(val) {
+                const q = val.toLowerCase();
+                const filtered = this.posts.filter(p => p.title.toLowerCase().includes(q) || p.topic.toLowerCase().includes(q));
+                this.renderGrid(filtered);
+            }
+        };
+
+        window.onload = () => app.init();
+    </script>
+</body>
+</html>
